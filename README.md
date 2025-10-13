@@ -1,0 +1,10 @@
+DJANGO_SECRET_KEY=dev-unsafe-key
+DJANGO_DEBUG=True
+ALLOWED_HOSTS=127.0.0.1,localhost
+
+DB_ENGINE=mysql
+DB_NAME=ecoenergy
+DB_USER=root
+DB_PASSWORD=tu_clave
+DB_HOST=127.0.0.1
+DB_PORT=3306
