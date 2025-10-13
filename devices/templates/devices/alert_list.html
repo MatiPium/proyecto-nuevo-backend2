@@ -1,0 +1,29 @@
+{% extends "devices/base.html" %}
+{% block content %}
+<h2>Alerts</h2>
+<a class="btn btn-primary mb-3" href="{% url 'alert_create' %}">New alert</a>
+
+<table class="table">
+  <thead>
+    <tr><th>Device</th><th>Organization</th><th>Severity</th><th>Message</th><th>Date</th></tr>
+  </thead>
+  <tbody>
+    {% for a in alerts %}
+      <tr>
+        <td>{{ a.device.name }}</td>
+        <td>{{ a.organization.name }}</td>
+        <td>
+          {% if a.severity == 'HIGH' %}<span class="badge bg-danger">HIGH</span>
+          {% elif a.severity == 'MEDIUM' %}<span class="badge bg-warning text-dark">MEDIUM</span>
+          {% else %}<span class="badge bg-secondary">LOW</span>{% endif %}
+        </td>
+        <td>{{ a.message }}</td>
+        <td>{{ a.created_at|date:"Y-m-d H:i" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5">No alerts.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+

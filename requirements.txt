@@ -1,0 +1,5 @@
+Django==4.2.*
+python-dotenv==1.0.*
+Pillow==10.*
+PyMySQL==1.1.*
+django-widget-tweaks==1.5.*
