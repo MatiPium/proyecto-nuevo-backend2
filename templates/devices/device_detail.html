@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ device.name }} - EcoEnergy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'device_list' %}">Dispositivos</a></li>
+                    <li class="breadcrumb-item active">{{ device.name }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-microchip"></i> {{ device.name }}
+                        {% if device.is_active %}
+                            <span class="badge bg-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactivo</span>
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p><strong><i class="fas fa-layer-group"></i> Tipo:</strong> {{ device.device_type }}</p>
+                            <p><strong><i class="fas fa-map-marker-alt"></i> Ubicación:</strong> {{ device.location|default:"No especificada" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong><i class="fas fa-user"></i> Propietario:</strong> {{ device.owner.username }}</p>
+                            <p><strong><i class="fas fa-calendar"></i> Fecha de creación:</strong> {{ device.created_at|date:"d/m/Y H:i" }}</p>
+                        </div>
+                    </div>
+
+                    {% if device.description %}
+                    <div class="mb-3">
+                        <p><strong><i class="fas fa-file-alt"></i> Descripción:</strong></p>
+                        <p class="text-muted">{{ device.description }}</p>
+                    </div>
+                    {% endif %}
+
+                    <hr>
+
+                    <div class="d-flex gap-2">
+                        {% if perms.devices.change_device %}
+                        <a href="{% url 'update_device' device.pk %}" class="btn btn-warning">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                        {% endif %}
+                        {% if perms.devices.delete_device %}
+                        <a href="{% url 'delete_device' device.pk %}" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Eliminar
+                        </a>
+                        {% endif %}
+                        <a href="{% url 'device_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Volver
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-line"></i> Estadísticas</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Total de mediciones:</strong> {{ measurements_count }}</p>
+                    <p><strong>Última actualización:</strong> {{ device.updated_at|date:"d/m/Y H:i" }}</p>
+                    <a href="{% url 'measurement_list' %}?device={{ device.id }}" class="btn btn-info btn-sm w-100">
+                        <i class="fas fa-chart-bar"></i> Ver Mediciones
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

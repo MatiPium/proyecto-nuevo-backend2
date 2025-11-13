@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+
+{% block title %}Mi Perfil - EcoEnergy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-user-circle"></i> Mi Perfil
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-4 text-center">
+                            <div class="profile-avatar mb-3">
+                                {% if user.profile.avatar %}
+                                    <img src="{{ user.profile.avatar.url }}" alt="{{ user.username }}" 
+                                         class="rounded-circle img-fluid" style="max-width: 200px; max-height: 200px; object-fit: cover; border: 3px solid #007bff;">
+                                {% else %}
+                                    <i class="fas fa-user-circle fa-7x text-primary"></i>
+                                {% endif %}
+                            </div>
+                            <h5>{{ user.username }}</h5>
+                            {% if user.is_superuser %}
+                                <span class="badge bg-danger">Superadministrador</span>
+                            {% elif user.is_staff %}
+                                <span class="badge bg-danger">Administrador</span>
+                            {% else %}
+                                {% for group in user.groups.all %}
+                                    {% if group.name == 'Editor' %}
+                                        <span class="badge bg-warning">Editor</span>
+                                    {% elif group.name == 'Lector' %}
+                                        <span class="badge bg-info">Lector</span>
+                                    {% else %}
+                                        <span class="badge bg-success">{{ group.name }}</span>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        <div class="col-md-8">
+                            <h5 class="mb-3">Información Personal</h5>
+                            
+                            <div class="mb-3">
+                                <label class="text-muted">
+                                    <i class="fas fa-user"></i> Nombre de usuario
+                                </label>
+                                <p class="fw-bold">{{ user.username }}</p>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="text-muted">
+                                    <i class="fas fa-envelope"></i> Correo electrónico
+                                </label>
+                                <p class="fw-bold">{{ user.email|default:"No especificado" }}</p>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="text-muted">
+                                        <i class="fas fa-id-card"></i> Nombre
+                                    </label>
+                                    <p class="fw-bold">{{ user.first_name|default:"No especificado" }}</p>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="text-muted">
+                                        <i class="fas fa-id-card"></i> Apellido
+                                    </label>
+                                    <p class="fw-bold">{{ user.last_name|default:"No especificado" }}</p>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="text-muted">
+                                    <i class="fas fa-phone"></i> Teléfono
+                                </label>
+                                <p class="fw-bold">{{ user.profile.phone|default:"No especificado" }}</p>
+                            </div>
+
+                            {% if user.profile.bio %}
+                            <div class="mb-3">
+                                <label class="text-muted">
+                                    <i class="fas fa-info-circle"></i> Biografía
+                                </label>
+                                <p class="fw-bold">{{ user.profile.bio }}</p>
+                            </div>
+                            {% endif %}
+
+                            <div class="mb-3">
+                                <label class="text-muted">
+                                    <i class="fas fa-calendar"></i> Fecha de registro
+                                </label>
+                                <p class="fw-bold">{{ user.date_joined|date:"d/m/Y H:i" }}</p>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="text-muted">
+                                    <i class="fas fa-clock"></i> Último acceso
+                                </label>
+                                <p class="fw-bold">{{ user.last_login|date:"d/m/Y H:i" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-microchip fa-2x text-primary mb-2"></i>
+                                    <h3 class="mb-0">{{ device_count }}</h3>
+                                    <small class="text-muted">Dispositivos</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chart-bar fa-2x text-success mb-2"></i>
+                                    <h3 class="mb-0">{{ measurement_count }}</h3>
+                                    <small class="text-muted">Mediciones</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-bell fa-2x text-warning mb-2"></i>
+                                    <h3 class="mb-0">{{ alert_count }}</h3>
+                                    <small class="text-muted">Alertas</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                        </a>
+                        <a href="{% url 'edit_profile' %}" class="btn btn-primary">
+                            <i class="fas fa-edit"></i> Editar Perfil
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

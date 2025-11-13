@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Alertas - EcoEnergy{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-bell"></i> Alertas del Sistema</h2>
+            <p class="text-muted">Historial de alertas y notificaciones</p>
+        </div>
+    </div>
+
+    <div class="row">
+        {% if alerts %}
+            {% for alert in alerts %}
+            <div class="col-md-6 mb-3">
+                <div class="card border-{{ alert.severity }}">
+                    <div class="card-header bg-{{ alert.severity }} text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <i class="fas fa-microchip"></i> {{ alert.device.name }}
+                            </h6>
+                            <span class="badge bg-light text-dark">
+                                {{ alert.get_severity_display }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">{{ alert.message }}</p>
+                        <small class="text-muted">
+                            <i class="fas fa-clock"></i> {{ alert.created_at|date:"d/m/Y H:i:s" }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info text-center" role="alert">
+                    <i class="fas fa-info-circle fa-3x mb-3 d-block"></i>
+                    <h5>No hay alertas registradas</h5>
+                    <p class="mb-0">Cuando se generen alertas, aparecerán aquí.</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

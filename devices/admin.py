@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Organization, Zone, Device, Category, Measurement, Alert # importa SOLO lo que exista
+from .models import Organization, Zone, Device, Category, Measurement, Alert, DeviceType # importa SOLO lo que exista
 from accounts.models import UserProfile  # nuevo
 
 def _user_org(request):
@@ -56,12 +56,24 @@ def make_active(modeladmin, request, queryset):
 
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
-    list_display = ("name", "organization", "zone", "status")
-    search_fields = ("name", "organization__name", "zone__name")
-    list_filter = ("organization", "zone", "status")
-    list_select_related = ("organization", "zone", "category")
-    readonly_fields = ("created_at", "updated_at", "deleted_at")  # evita tocar soft-delete
-    actions = [make_active]  # deja tu acción como la tienes
+    """Administración de dispositivos"""
+    list_display = ['name', 'device_type', 'owner', 'location', 'is_active', 'created_at']
+    list_filter = ['device_type', 'is_active', 'created_at']
+    search_fields = ['name', 'location', 'owner__username']
+    readonly_fields = ['created_at', 'updated_at']
+    
+    fieldsets = (
+        ('Información General', {
+            'fields': ('name', 'device_type', 'owner', 'location')
+        }),
+        ('Estado', {
+            'fields': ('is_active',)
+        }),
+        ('Fechas', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
     def get_queryset(self, request):
         qs = super().get_queryset(request).select_related("organization", "zone", "category")
@@ -106,51 +118,52 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Measurement)
 class MeasurementAdmin(admin.ModelAdmin):
-    list_display = ("device", "organization", "consumption", "created_at")
-    search_fields = ("device__name", "organization__name")
-    list_filter = ("organization", "device")
-    date_hierarchy = "created_at"
-    list_select_related = ("device", "organization")
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request).select_related("device", "organization")
-        if request.user.is_superuser:
-            return qs
-        org = _user_org(request)
-        return qs.filter(organization=org)
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if not request.user.is_superuser:
-            org = _user_org(request)
-            if org:
-                if db_field.name == "organization":
-                    kwargs["queryset"] = Organization.objects.filter(pk=org.pk)
-                if db_field.name == "device":
-                    kwargs["queryset"] = Device.objects.filter(organization=org)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    """Administración de mediciones"""
+    list_display = ['device', 'value', 'unit', 'timestamp']
+    list_filter = ['device', 'timestamp']
+    search_fields = ['device__name']
+    date_hierarchy = 'timestamp'
+    readonly_fields = ['timestamp']
     
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('device', 'device__owner')
+
 
 @admin.register(Alert)
 class AlertAdmin(admin.ModelAdmin):
-    list_display = ("device", "organization", "severity", "message", "created_at")
-    search_fields = ("device__name", "organization__name", "message")
-    list_filter = ("organization", "severity", "device")
-    date_hierarchy = "created_at"
-    list_select_related = ("device", "organization")
-
+    """Administración de alertas"""
+    list_display = ['device', 'severity', 'message', 'is_resolved', 'created_at']
+    list_filter = ['severity', 'is_resolved', 'created_at']
+    search_fields = ['device__name', 'message']
+    readonly_fields = ['created_at']
+    
+    fieldsets = (
+        ('Información de la Alerta', {
+            'fields': ('device', 'message', 'severity')
+        }),
+        ('Estado', {
+            'fields': ('is_resolved', 'resolved_at')
+        }),
+        ('Fechas', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+    
     def get_queryset(self, request):
-        qs = super().get_queryset(request).select_related("device", "organization")
-        if request.user.is_superuser:
-            return qs
-        org = _user_org(request)  # mismo helper que usaste para Device/Measurement
-        return qs.filter(organization=org)
+        qs = super().get_queryset(request)
+        return qs.select_related('device', 'device__owner')
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if not request.user.is_superuser:
-            org = _user_org(request)
-            if org:
-                if db_field.name == "organization":
-                    kwargs["queryset"] = Organization.objects.filter(pk=org.pk)
-                if db_field.name == "device":
-                    kwargs["queryset"] = Device.objects.filter(organization=org)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+@admin.register(DeviceType)
+class DeviceTypeAdmin(admin.ModelAdmin):
+    """Administración de tipos de dispositivos"""
+    list_display = ['name', 'description']
+    search_fields = ['name']
+
+
+# Personalizar el sitio de administración
+admin.site.site_header = "EcoEnergy Monitor - Administración"
+admin.site.site_title = "EcoEnergy Admin"
+admin.site.index_title = "Panel de Control"

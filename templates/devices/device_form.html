@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if form.instance.pk %}Editar Dispositivo{% else %}Crear Dispositivo{% endif %} - EcoEnergy
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-microchip"></i>
+                        {% if form.instance.pk %}
+                            Editar Dispositivo
+                        {% else %}
+                            Crear Nuevo Dispositivo
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="id_name" class="form-label">
+                                <i class="fas fa-tag"></i> Nombre del Dispositivo *
+                            </label>
+                            <input type="text" class="form-control {% if form.name.errors %}is-invalid{% endif %}" 
+                                   id="id_name" name="name" value="{{ form.name.value|default:'' }}" 
+                                   placeholder="Ej: Sensor Principal" required>
+                            {% if form.name.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.name.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_device_type" class="form-label">
+                                <i class="fas fa-layer-group"></i> Tipo de Dispositivo *
+                            </label>
+                            <select class="form-select {% if form.device_type.errors %}is-invalid{% endif %}" 
+                                    id="id_device_type" name="device_type" required>
+                                <option value="">Selecciona un tipo</option>
+                                {% for type in device_types %}
+                                <option value="{{ type.id }}" 
+                                    {% if form.device_type.value == type.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ type.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.device_type.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.device_type.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_location" class="form-label">
+                                <i class="fas fa-map-marker-alt"></i> Ubicación
+                            </label>
+                            <input type="text" class="form-control {% if form.location.errors %}is-invalid{% endif %}" 
+                                   id="id_location" name="location" value="{{ form.location.value|default:'' }}" 
+                                   placeholder="Ej: Oficina Principal, Sala 101">
+                            {% if form.location.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.location.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_description" class="form-label">
+                                <i class="fas fa-file-alt"></i> Descripción
+                            </label>
+                            <textarea class="form-control {% if form.description.errors %}is-invalid{% endif %}" 
+                                      id="id_description" name="description" rows="3" 
+                                      placeholder="Descripción detallada del dispositivo...">{{ form.description.value|default:'' }}</textarea>
+                            {% if form.description.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.description.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="id_is_active" name="is_active"
+                                   {% if form.is_active.value or not form.instance.pk %}checked{% endif %}>
+                            <label class="form-check-label" for="id_is_active">
+                                <i class="fas fa-toggle-on"></i> Dispositivo Activo
+                            </label>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'device_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 
+                                {% if form.instance.pk %}Actualizar{% else %}Crear{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

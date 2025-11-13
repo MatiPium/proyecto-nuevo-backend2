@@ -1,104 +1,110 @@
 from django.core.management.base import BaseCommand
+from django.contrib.auth.models import User
 from django.utils import timezone
-from decimal import Decimal
+from datetime import timedelta
 import random
+from decimal import Decimal
+from devices.models import Device, DeviceType, Measurement, Alert
 
-from devices.models import Organization, Zone, Category, Device, Measurement
-# Si tienes Alert, puedes importarlo y sembrar algunas también:
-# from devices.models import Alert
 
 class Command(BaseCommand):
-    help = "Crea datos mínimos de ejemplo para probar la app (orgs, zones, categories, devices, measurements)."
+    help = 'Seed mínimo con datos de prueba'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE("⏳ Sembrando datos de ejemplo..."))
+        self.stdout.write('🌱 Creando datos...')
 
-        # --- 1) Organizations ---
-        org_a, _ = Organization.objects.get_or_create(name="Org Alpha")
-        org_b, _ = Organization.objects.get_or_create(name="Org Beta")
+        # Obtener admin
+        admin = User.objects.filter(is_superuser=True).first()
+        if not admin:
+            self.stdout.write(self.style.ERROR('❌ Crea primero un superusuario'))
+            return
 
-        # --- 2) Zones (por org) ---
-        zonas_a = [
-            Zone.objects.get_or_create(name="Planta 1", organization=org_a)[0],
-            Zone.objects.get_or_create(name="Planta 2", organization=org_a)[0],
-        ]
-        zonas_b = [
-            Zone.objects.get_or_create(name="Edificio A", organization=org_b)[0],
-            Zone.objects.get_or_create(name="Edificio B", organization=org_b)[0],
-        ]
-
-        # --- 3) Categories (por org) ---
-        cat_luz_a   = Category.objects.get_or_create(name="Iluminación",   organization=org_a)[0]
-        cat_clima_a  = Category.objects.get_or_create(name="Climatización", organization=org_a)[0]
-        cat_luz_b   = Category.objects.get_or_create(name="Iluminación",   organization=org_b)[0]
-        cat_clima_b  = Category.objects.get_or_create(name="Climatización", organization=org_b)[0]
-
-        # --- 4) Devices ---
-        def mk_device(name, org, zone, category, max_cons=100):
-            dev, _ = Device.objects.get_or_create(
-                name=name,
-                defaults={
-                    "organization": org,
-                    "zone": zone,
-                    "category": category,
-                    "maximum_consumption": Decimal(max_cons),
-                    # Ajusta si en tu modelo 'status' es otra cosa (ej. booleano)
-                    "status": "ACTIVE",
-                },
+        # Tipos de dispositivos
+        tipos = []
+        for nombre in ['Panel Solar', 'Medidor Inteligente', 'Inversor', 'Batería', 'Sensor']:
+            tipo, _ = DeviceType.objects.get_or_create(
+                name=nombre, 
+                defaults={'description': f'Dispositivo tipo {nombre} para monitoreo energético'}
             )
-            # sincroniza por si ya existía
-            dev.organization = org
-            dev.zone = zone
-            dev.category = category
-            dev.maximum_consumption = Decimal(max_cons)
-            dev.status = getattr(dev, "status", "ACTIVE")
-            dev.save()
-            return dev
+            tipos.append(tipo)
+        self.stdout.write(f'✅ {len(tipos)} tipos de dispositivos')
 
-        devs_a = [
-            mk_device("Lampara-001", org_a, zonas_a[0], cat_luz_a,   80),
-            mk_device("Aire-001",    org_a, zonas_a[1], cat_clima_a, 300),
-            mk_device("Lampara-002", org_a, zonas_a[0], cat_luz_a,   80),
+        # Dispositivos
+        dispositivos = []
+        nombres_devices = [
+            'Panel Solar Techo A',
+            'Panel Solar Techo B', 
+            'Medidor Principal',
+            'Inversor Central',
+            'Batería Respaldo'
         ]
-        devs_b = [
-            mk_device("Lampara-101", org_b, zonas_b[0], cat_luz_b,   80),
-            mk_device("Aire-101",    org_b, zonas_b[1], cat_clima_b, 300),
+        
+        for i, nombre in enumerate(nombres_devices):
+            device, created = Device.objects.get_or_create(
+                name=nombre,
+                owner=admin,
+                defaults={
+                    'device_type': tipos[i % len(tipos)],
+                    'location': f'Zona {chr(65+i)} - Piso {(i % 3) + 1}',
+                    'is_active': True
+                }
+            )
+            dispositivos.append(device)
+            
+        self.stdout.write(f'✅ {len(dispositivos)} dispositivos')
+
+        # Mediciones (últimos 7 días, 2 por día)
+        now = timezone.now()
+        count_measurements = 0
+        
+        for device in dispositivos:
+            for day in range(7):
+                for hour in [9, 18]:
+                    try:
+                        # Generar valor entre 10 y 100 con 2 decimales
+                        value = Decimal(str(round(random.uniform(10.0, 100.0), 2)))
+                        
+                        Measurement.objects.create(
+                            device=device,
+                            value=value,
+                            unit='kWh',
+                            timestamp=now - timedelta(days=day, hours=24-hour)
+                        )
+                        count_measurements += 1
+                    except Exception as e:
+                        self.stdout.write(self.style.WARNING(f'⚠️  Error: {e}'))
+
+        self.stdout.write(f'✅ {count_measurements} mediciones')
+
+        # Alertas
+        count_alerts = 0
+        mensajes = [
+            'Consumo superior al promedio detectado en las últimas 24 horas',
+            'Dispositivo presenta lecturas irregulares que requieren revisión',
+            'Mantenimiento preventivo recomendado según horas de operación',
+            'Temperatura del sistema por encima del rango normal de operación',
+            'Eficiencia de conversión por debajo del umbral esperado'
         ]
-
-        # --- 5) Measurements ---
-        # Detecta dinámicamente cómo se llama el campo de fecha/tiempo
-        m_fields = [f.name for f in Measurement._meta.get_fields()]
-        ts_field = None
-        for cand in ("date", "created_at", "timestamp"):
-            if cand in m_fields:
-                ts_field = cand
-                break
-
-        def mk_measurements(devs, org, n=12):
-            for _ in range(n):
-                d = random.choice(devs)
-                # consumo aleatorio (hasta 90% del máximo)
-                val = round(random.uniform(1.0, float(d.maximum_consumption) * 0.9), 2)
-                extra = {}
-                if ts_field:
-                    extra[ts_field] = timezone.now() - timezone.timedelta(hours=random.randint(0, 72))
-                Measurement.objects.create(
-                    device=d,
-                    organization=org,
-                    consumption=Decimal(str(val)),
-                    **extra
+        
+        try:
+            for device in random.sample(dispositivos, min(3, len(dispositivos))):
+                Alert.objects.create(
+                    device=device,
+                    severity=random.choice(['low', 'medium', 'high']),
+                    message=random.choice(mensajes),
+                    is_resolved=random.choice([True, False])
                 )
+                count_alerts += 1
+            self.stdout.write(f'✅ {count_alerts} alertas')
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'⚠️  Error creando alertas: {e}'))
 
-        mk_measurements(devs_a, org_a, n=16)
-        mk_measurements(devs_b, org_b, n=12)
-
-        # --- 6) (Opcional) Alerts ---
-        # if 'Alert' in globals():
-        #     for d in devs_a + devs_b:
-        #         Alert.objects.get_or_create(
-        #             device=d, organization=d.organization,
-        #             message=f"Alerta de prueba en {d.name}",
-        #             severity=random.choice(["LOW","MEDIUM","HIGH"])
-        #         )
-
-        self.stdout.write(self.style.SUCCESS("✅ Seed mínima creada con éxito."))
+        # Resumen
+        self.stdout.write(self.style.SUCCESS('\n' + '='*50))
+        self.stdout.write(self.style.SUCCESS('🎉 SEED COMPLETADO EXITOSAMENTE'))
+        self.stdout.write(self.style.SUCCESS('='*50))
+        self.stdout.write(f'📊 Tipos: {len(tipos)}')
+        self.stdout.write(f'📱 Dispositivos: {len(dispositivos)}')
+        self.stdout.write(f'📈 Mediciones: {count_measurements}')
+        self.stdout.write(f'⚠️  Alertas: {count_alerts}')
+        self.stdout.write(self.style.SUCCESS('='*50))

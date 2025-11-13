@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Perfil - EcoEnergy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-user-edit"></i> Editar Perfil
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        <h5 class="mb-3"><i class="fas fa-image"></i> Foto de Perfil</h5>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-4 text-center">
+                                <div class="mb-3">
+                                    {% if user.profile.avatar %}
+                                        <img src="{{ user.profile.avatar.url }}" alt="Avatar actual" 
+                                             class="rounded-circle img-fluid" id="preview-avatar"
+                                             style="max-width: 150px; max-height: 150px; object-fit: cover; border: 2px solid #007bff;">
+                                    {% else %}
+                                        <i class="fas fa-user-circle fa-5x text-secondary" id="preview-icon"></i>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="avatar" class="form-label">Cambiar foto de perfil</label>
+                                    <input type="file" class="form-control" id="avatar" name="avatar" 
+                                           accept="image/jpeg,image/jpg,image/png,image/gif">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle"></i> 
+                                        Formatos permitidos: JPG, PNG, GIF. Tamaño máximo: 2MB
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h5 class="mb-3"><i class="fas fa-user"></i> Información Personal</h5>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="first_name" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" 
+                                       value="{{ user.first_name }}" placeholder="Tu nombre">
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="last_name" class="form-label">Apellido</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" 
+                                       value="{{ user.last_name }}" placeholder="Tu apellido">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">
+                                <i class="fas fa-envelope"></i> Correo Electrónico *
+                            </label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   value="{{ user.email }}" placeholder="tu@email.com" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">
+                                <i class="fas fa-phone"></i> Teléfono
+                            </label>
+                            <input type="text" class="form-control" id="phone" name="phone" 
+                                   value="{{ user.profile.phone|default:'' }}" 
+                                   placeholder="+56912345678 o 912345678">
+                            <small class="text-muted">Formato: +56912345678 o 912345678</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="bio" class="form-label">
+                                <i class="fas fa-info-circle"></i> Biografía
+                            </label>
+                            <textarea class="form-control" id="bio" name="bio" rows="3" 
+                                      maxlength="500" placeholder="Cuéntanos un poco sobre ti...">{{ user.profile.bio|default:'' }}</textarea>
+                            <small class="text-muted">Máximo 500 caracteres</small>
+                        </div>
+
+                        <hr>
+
+                        <h5 class="mb-3"><i class="fas fa-lock"></i> Cambiar Contraseña (Opcional)</h5>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Requisitos de contraseña:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Mínimo 8 caracteres</li>
+                                <li>Al menos una letra mayúscula</li>
+                                <li>Al menos una letra minúscula</li>
+                                <li>Al menos un número</li>
+                            </ul>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">Nueva Contraseña</label>
+                            <input type="password" class="form-control" id="new_password" name="new_password" 
+                                   placeholder="Mínimo 8 caracteres">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password_confirm" class="form-label">Confirmar Nueva Contraseña</label>
+                            <input type="password" class="form-control" id="password_confirm" name="password_confirm" 
+                                   placeholder="Repite la nueva contraseña">
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'profile' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Guardar Cambios
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Vista previa de imagen
+document.getElementById('avatar').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        // Validar tamaño
+        if (file.size > 2 * 1024 * 1024) {
+            alert('La imagen no puede superar los 2MB');
+            this.value = '';
+            return;
+        }
+        
+        // Validar tipo
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Formato inválido. Usa JPG, PNG o GIF');
+            this.value = '';
+            return;
+        }
+        
+        // Mostrar vista previa
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('preview-avatar');
+            const icon = document.getElementById('preview-icon');
+            
+            if (preview) {
+                preview.src = e.target.result;
+            } else if (icon) {
+                icon.outerHTML = `<img src="${e.target.result}" alt="Vista previa" class="rounded-circle img-fluid" id="preview-avatar" style="max-width: 150px; max-height: 150px; object-fit: cover; border: 2px solid #007bff;">`;
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Validación de contraseña en tiempo real
+document.getElementById('new_password').addEventListener('input', function() {
+    const password = this.value;
+    const feedback = document.getElementById('password-feedback') || createPasswordFeedback();
+    
+    const requirements = {
+        length: password.length >= 8,
+        uppercase: /[A-Z]/.test(password),
+        lowercase: /[a-z]/.test(password),
+        number: /\d/.test(password)
+    };
+    
+    let html = '<small class="text-muted"><ul class="mb-0">';
+    html += `<li class="${requirements.length ? 'text-success' : 'text-danger'}">${requirements.length ? '✓' : '✗'} Mínimo 8 caracteres</li>`;
+    html += `<li class="${requirements.uppercase ? 'text-success' : 'text-danger'}">${requirements.uppercase ? '✓' : '✗'} Una mayúscula</li>`;
+    html += `<li class="${requirements.lowercase ? 'text-success' : 'text-danger'}">${requirements.lowercase ? '✓' : '✗'} Una minúscula</li>`;
+    html += `<li class="${requirements.number ? 'text-success' : 'text-danger'}">${requirements.number ? '✓' : '✗'} Un número</li>`;
+    html += '</ul></small>';
+    
+    feedback.innerHTML = html;
+});
+
+function createPasswordFeedback() {
+    const feedback = document.createElement('div');
+    feedback.id = 'password-feedback';
+    document.getElementById('new_password').parentNode.appendChild(feedback);
+    return feedback;
+}
+</script>
+{% endblock %}

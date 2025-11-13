@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Eliminar Dispositivo - EcoEnergy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <strong>¡Atención!</strong> Esta acción no se puede deshacer.
+                    </div>
+
+                    <h5 class="mb-3">¿Estás seguro que deseas eliminar este dispositivo?</h5>
+                    
+                    <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <p class="mb-2">
+                                <strong><i class="fas fa-microchip"></i> Nombre:</strong> 
+                                {{ device.name }}
+                            </p>
+                            <p class="mb-2">
+                                <strong><i class="fas fa-layer-group"></i> Tipo:</strong> 
+                                {{ device.device_type }}
+                            </p>
+                            <p class="mb-2">
+                                <strong><i class="fas fa-map-marker-alt"></i> Ubicación:</strong> 
+                                {{ device.location|default:"No especificada" }}
+                            </p>
+                            <p class="mb-0">
+                                <strong><i class="fas fa-calendar"></i> Creado:</strong> 
+                                {{ device.created_at|date:"d/m/Y H:i" }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning" role="alert">
+                        <i class="fas fa-info-circle"></i>
+                        Se eliminarán también:
+                        <ul class="mb-0 mt-2">
+                            <li>Todas las mediciones asociadas</li>
+                            <li>Todas las alertas relacionadas</li>
+                            <li>Todo el historial del dispositivo</li>
+                        </ul>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'device_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Sí, Eliminar Dispositivo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

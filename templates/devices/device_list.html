@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+
+{% block title %}Dispositivos - EcoEnergy{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-microchip"></i> Dispositivos</h2>
+            <p class="text-muted">Gestiona tus dispositivos de monitoreo</p>
+        </div>
+        <div class="col-auto">
+            {% if can_add %}
+            <a href="{% url 'create_device' %}" class="btn btn-success">
+                <i class="fas fa-plus"></i> Nuevo Dispositivo
+            </a>
+            {% endif %}
+            <a href="{% url 'export_devices' %}" class="btn btn-primary">
+                <i class="fas fa-file-excel"></i> Exportar Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- 🔍 Buscador y Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-6">
+                    <label for="search" class="form-label">Buscar</label>
+                    <input type="text" class="form-control" id="search" name="q" 
+                           value="{{ search_query }}" 
+                           placeholder="Buscar por nombre, ubicación o tipo...">
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="page_size" class="form-label">Resultados por página</label>
+                    <select class="form-select" id="page_size" name="page_size" onchange="this.form.submit()">
+                        <option value="5" {% if page_size == 5 %}selected{% endif %}>5</option>
+                        <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
+                        <option value="15" {% if page_size == 15 %}selected{% endif %}>15</option>
+                        <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                    <a href="{% url 'device_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Limpiar
+                    </a>
+                </div>
+                
+                <!-- Mantener el sort en el formulario -->
+                <input type="hidden" name="sort" value="{{ current_sort }}">
+            </form>
+        </div>
+    </div>
+
+    <!-- 📊 Tabla de Dispositivos -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>
+                                <a href="?q={{ search_query }}&sort={% if current_sort == 'name' %}-name{% else %}name{% endif %}&page_size={{ page_size }}" 
+                                   class="text-decoration-none text-dark">
+                                    Nombre
+                                    {% if current_sort == 'name' %}
+                                        <i class="fas fa-sort-up"></i>
+                                    {% elif current_sort == '-name' %}
+                                        <i class="fas fa-sort-down"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?q={{ search_query }}&sort={% if current_sort == 'device_type__name' %}-device_type__name{% else %}device_type__name{% endif %}&page_size={{ page_size }}" 
+                                   class="text-decoration-none text-dark">
+                                    Tipo
+                                    {% if current_sort == 'device_type__name' %}
+                                        <i class="fas fa-sort-up"></i>
+                                    {% elif current_sort == '-device_type__name' %}
+                                        <i class="fas fa-sort-down"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?q={{ search_query }}&sort={% if current_sort == 'location' %}-location{% else %}location{% endif %}&page_size={{ page_size }}" 
+                                   class="text-decoration-none text-dark">
+                                    Ubicación
+                                    {% if current_sort == 'location' %}
+                                        <i class="fas fa-sort-up"></i>
+                                    {% elif current_sort == '-location' %}
+                                        <i class="fas fa-sort-down"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?q={{ search_query }}&sort={% if current_sort == 'is_active' %}-is_active{% else %}is_active{% endif %}&page_size={{ page_size }}" 
+                                   class="text-decoration-none text-dark">
+                                    Estado
+                                    {% if current_sort == 'is_active' %}
+                                        <i class="fas fa-sort-up"></i>
+                                    {% elif current_sort == '-is_active' %}
+                                        <i class="fas fa-sort-down"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?q={{ search_query }}&sort={% if current_sort == 'created_at' %}-created_at{% else %}created_at{% endif %}&page_size={{ page_size }}" 
+                                   class="text-decoration-none text-dark">
+                                    Fecha Creación
+                                    {% if current_sort == 'created_at' %}
+                                        <i class="fas fa-sort-up"></i>
+                                    {% elif current_sort == '-created_at' %}
+                                        <i class="fas fa-sort-down"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for device in page_obj.object_list %}
+                        <tr>
+                            <td>
+                                <strong>{{ device.name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ device.device_type }}</span>
+                            </td>
+                            <td>{{ device.location|default:"-" }}</td>
+                            <td>
+                                {% if device.is_active %}
+                                    <span class="badge bg-success">Activo</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inactivo</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ device.created_at|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <a href="{% url 'device_detail' device.pk %}" class="btn btn-sm btn-info" title="Ver detalle">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if can_edit %}
+                                <a href="{% url 'update_device' device.pk %}" class="btn btn-sm btn-warning" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% endif %}
+                                {% if can_delete %}
+                                <a href="{% url 'delete_device' device.pk %}" class="btn btn-sm btn-danger" title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                                {% if search_query %}
+                                    No se encontraron dispositivos con "{{ search_query }}"
+                                {% else %}
+                                    No hay dispositivos registrados
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 📄 Paginación -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="Navegación de páginas" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1&q={{ search_query }}&sort={{ current_sort }}&page_size={{ page_size }}">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&sort={{ current_sort }}&page_size={{ page_size }}">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&sort={{ current_sort }}&page_size={{ page_size }}">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&q={{ search_query }}&sort={{ current_sort }}&page_size={{ page_size }}">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

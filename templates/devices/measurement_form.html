@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if measurement %}Editar{% else %}Crear{% endif %} Medición - EcoEnergy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-chart-line"></i> 
+                        {% if measurement %}Editar Medición{% else %}Registrar Nueva Medición{% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="id_device" class="form-label">
+                                <i class="fas fa-microchip"></i> Dispositivo *
+                            </label>
+                            <select class="form-select {% if form.device.errors %}is-invalid{% endif %}" 
+                                    id="id_device" name="device" required {% if measurement %}disabled{% endif %}>
+                                <option value="">Selecciona un dispositivo</option>
+                                {% for device in user_devices %}
+                                <option value="{{ device.id }}" 
+                                    {% if form.device.value == device.id|stringformat:"s" or measurement.device.id == device.id %}selected{% endif %}>
+                                    {{ device.name }} ({{ device.device_type }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% if measurement %}
+                            <input type="hidden" name="device" value="{{ measurement.device.id }}">
+                            <small class="text-muted">No se puede cambiar el dispositivo al editar</small>
+                            {% endif %}
+                            {% if form.device.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.device.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="id_value" class="form-label">
+                                        <i class="fas fa-tachometer-alt"></i> Valor *
+                                    </label>
+                                    <input type="number" step="0.01" 
+                                           class="form-control {% if form.value.errors %}is-invalid{% endif %}" 
+                                           id="id_value" name="value" 
+                                           value="{{ form.value.value|default:'' }}" 
+                                           placeholder="Ej: 25.5" required>
+                                    {% if form.value.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.value.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="id_unit" class="form-label">
+                                        <i class="fas fa-ruler"></i> Unidad *
+                                    </label>
+                                    <select class="form-select {% if form.unit.errors %}is-invalid{% endif %}" 
+                                            id="id_unit" name="unit" required>
+                                        <option value="">Selecciona una unidad</option>
+                                        <option value="kWh" {% if form.unit.value == 'kWh' %}selected{% endif %}>kWh (Kilovatio-hora)</option>
+                                        <option value="W" {% if form.unit.value == 'W' %}selected{% endif %}>W (Vatios)</option>
+                                        <option value="A" {% if form.unit.value == 'A' %}selected{% endif %}>A (Amperios)</option>
+                                        <option value="V" {% if form.unit.value == 'V' %}selected{% endif %}>V (Voltios)</option>
+                                        <option value="°C" {% if form.unit.value == '°C' %}selected{% endif %}>°C (Grados Celsius)</option>
+                                        <option value="%" {% if form.unit.value == '%' %}selected{% endif %}>% (Porcentaje)</option>
+                                    </select>
+                                    {% if form.unit.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ form.unit.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_timestamp" class="form-label">
+                                <i class="fas fa-clock"></i> Fecha y Hora
+                            </label>
+                            <input type="datetime-local" 
+                                   class="form-control {% if form.timestamp.errors %}is-invalid{% endif %}" 
+                                   id="id_timestamp" name="timestamp" 
+                                   value="{{ form.timestamp.value|date:'Y-m-d\TH:i' }}">
+                            <small class="text-muted">
+                                {% if measurement %}Fecha actual: {{ measurement.timestamp|date:"d/m/Y H:i:s" }}{% else %}Dejar en blanco para usar la fecha y hora actual{% endif %}
+                            </small>
+                            {% if form.timestamp.errors %}
+                                <div class="invalid-feedback">
+                                    {{ form.timestamp.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'measurement_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i> {% if measurement %}Actualizar{% else %}Registrar{% endif %} Medición
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

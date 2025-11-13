@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - EcoEnergy{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1><i class="fas fa-home"></i> Dashboard</h1>
+            <p class="text-muted">Bienvenido, {{ user.username }}</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-microchip"></i> Dispositivos</h5>
+                    <h2>{{ total_devices }}</h2>
+                    <a href="{% url 'device_list' %}" class="btn btn-light btn-sm">Ver todos</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-check-circle"></i> Activos</h5>
+                    <h2>{{ active_devices }}</h2>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-chart-bar"></i> Mediciones</h5>
+                    <h2>{{ total_measurements }}</h2>
+                    <a href="{% url 'measurement_list' %}" class="btn btn-light btn-sm">Ver todas</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card text-white bg-danger mb-3">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-bell"></i> Alertas</h5>
+                    <h2>{{ total_alerts }}</h2>
+                    <a href="{% url 'alert_list' %}" class="btn btn-light btn-sm">Ver todas</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-microchip"></i> Mis Dispositivos</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_devices %}
+                    <div class="list-group">
+                        {% for device in recent_devices %}
+                        <a href="{% url 'device_detail' device.pk %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ device.name }}</h6>
+                                <small>
+                                    {% if device.is_active %}
+                                        <span class="badge bg-success">Activo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactivo</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <small class="text-muted">{{ device.device_type }} - {{ device.location }}</small>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">No tienes dispositivos registrados</p>
+                    <a href="{% url 'create_device' %}" class="btn btn-primary">Crear Dispositivo</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-bell"></i> Alertas Recientes</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_alerts %}
+                    <div class="list-group">
+                        {% for alert in recent_alerts %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ alert.device.name }}</h6>
+                                <small>
+                                    <span class="badge bg-{{ alert.severity }}">{{ alert.get_severity_display }}</span>
+                                </small>
+                            </div>
+                            <p class="mb-1">{{ alert.message }}</p>
+                            <small class="text-muted">{{ alert.created_at|date:"d/m/Y H:i" }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">No hay alertas recientes</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
