@@ -9,7 +9,7 @@ urlpatterns = [
     path('devices/', views.device_list, name='device_list'),
     path('devices/create/', views.create_device, name='create_device'),
     path('devices/<int:pk>/', views.device_detail, name='device_detail'),
-    path('devices/<int:pk>/edit/', views.update_device, name='edit_device'),
+    path('devices/<int:pk>/edit/', views.update_device, name='update_device'),
     path('devices/<int:pk>/delete/', views.delete_device, name='delete_device'),
     
     # Mediciones

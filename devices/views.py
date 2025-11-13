@@ -275,26 +275,26 @@ def create_device(request):
 def update_device(request, pk):
     """Actualizar un dispositivo existente"""
     device = get_object_or_404(Device, pk=pk, owner=request.user)
-    
+
     if request.method == 'POST':
         form = DeviceForm(request.POST, instance=device)
         if form.is_valid():
             device = form.save()
-            messages.success(request, f'Dispositivo "{device.name}" actualizado exitosamente.')
+            messages.success(request, f'Dispositivo "{device.name}" actualizado exitosamente.')      
             return redirect('device_list')
         else:
             messages.error(request, 'Por favor corrige los errores del formulario.')
     else:
         form = DeviceForm(instance=device)
-    
-    # Obtener todos los tipos de dispositivos
+
     device_types = DeviceType.objects.all()
-    
+
     context = {
         'form': form,
+        'device': device,
         'device_types': device_types,
     }
-    return render(request, 'devices/device_form.html', context)
+    return render(request, 'devices/update_device.html', context)  # Usar update_device.html
 
 
 @login_required
