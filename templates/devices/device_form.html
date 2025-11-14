@@ -27,11 +27,9 @@
                             <label for="id_name" class="form-label">
                                 <i class="fas fa-tag"></i> Nombre del Dispositivo *
                             </label>
-                            <input type="text" class="form-control {% if form.name.errors %}is-invalid{% endif %}" 
-                                   id="id_name" name="name" value="{{ form.name.value|default:'' }}" 
-                                   placeholder="Ej: Sensor Principal" required>
+                            {{ form.name }}
                             {% if form.name.errors %}
-                                <div class="invalid-feedback">
+                                <div class="invalid-feedback d-block">
                                     {{ form.name.errors.0 }}
                                 </div>
                             {% endif %}
@@ -41,33 +39,46 @@
                             <label for="id_device_type" class="form-label">
                                 <i class="fas fa-layer-group"></i> Tipo de Dispositivo *
                             </label>
-                            <select class="form-select {% if form.device_type.errors %}is-invalid{% endif %}" 
-                                    id="id_device_type" name="device_type" required>
-                                <option value="">Selecciona un tipo</option>
-                                {% for type in device_types %}
-                                <option value="{{ type.id }}" 
-                                    {% if form.device_type.value == type.id|stringformat:"s" %}selected{% endif %}>
-                                    {{ type.name }}
-                                </option>
-                                {% endfor %}
-                            </select>
+                            {{ form.device_type }}
                             {% if form.device_type.errors %}
-                                <div class="invalid-feedback">
+                                <div class="invalid-feedback d-block">
                                     {{ form.device_type.errors.0 }}
                                 </div>
                             {% endif %}
                         </div>
 
                         <div class="mb-3">
-                            <label for="id_location" class="form-label">
-                                <i class="fas fa-map-marker-alt"></i> Ubicación
+                            <label for="id_status" class="form-label">
+                                <i class="fas fa-signal"></i> Estado *
                             </label>
-                            <input type="text" class="form-control {% if form.location.errors %}is-invalid{% endif %}" 
-                                   id="id_location" name="location" value="{{ form.location.value|default:'' }}" 
-                                   placeholder="Ej: Oficina Principal, Sala 101">
-                            {% if form.location.errors %}
-                                <div class="invalid-feedback">
-                                    {{ form.location.errors.0 }}
+                            {{ form.status }}
+                            {% if form.status.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.status.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_category" class="form-label">
+                                <i class="fas fa-folder"></i> Categoría
+                            </label>
+                            {{ form.category }}
+                            {% if form.category.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.category.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_zone" class="form-label">
+                                <i class="fas fa-map-marker-alt"></i> Zona
+                            </label>
+                            {{ form.zone }}
+                            {% if form.zone.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.zone.errors.0 }}
                                 </div>
                             {% endif %}
                         </div>
@@ -76,22 +87,12 @@
                             <label for="id_description" class="form-label">
                                 <i class="fas fa-file-alt"></i> Descripción
                             </label>
-                            <textarea class="form-control {% if form.description.errors %}is-invalid{% endif %}" 
-                                      id="id_description" name="description" rows="3" 
-                                      placeholder="Descripción detallada del dispositivo...">{{ form.description.value|default:'' }}</textarea>
+                            {{ form.description }}
                             {% if form.description.errors %}
-                                <div class="invalid-feedback">
+                                <div class="invalid-feedback d-block">
                                     {{ form.description.errors.0 }}
                                 </div>
                             {% endif %}
-                        </div>
-
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="id_is_active" name="is_active"
-                                   {% if form.is_active.value or not form.instance.pk %}checked{% endif %}>
-                            <label class="form-check-label" for="id_is_active">
-                                <i class="fas fa-toggle-on"></i> Dispositivo Activo
-                            </label>
                         </div>
 
                         <hr>

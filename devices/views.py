@@ -201,11 +201,11 @@ def device_list(request):
     if hasattr(request.user, 'profile') and request.user.profile.organization:
         user_org = request.user.profile.organization
     
-    # Filtrar dispositivos por organización
+    # Filtrar dispositivos por organización O por propietario si no hay organización
     if user_org:
         devices = Device.objects.filter(
-            zone__organization=user_org
-        ).select_related('category', 'zone', 'owner')  # ← ELIMINADO 'device_type'
+            Q(zone__organization=user_org) | Q(zone__isnull=True, owner=request.user)
+        ).select_related('category', 'zone', 'owner')
     else:
         # Si no tiene organización, solo ve sus propios dispositivos
         devices = Device.objects.filter(owner=request.user).select_related('category', 'zone', 'owner')
@@ -231,8 +231,22 @@ def device_list(request):
     if zone:
         devices = devices.filter(zone_id=zone)
     
+    # Paginación
+    per_page = request.GET.get('per_page', 10)  # Cambiar de 15 a 10
+    try:
+        per_page = int(per_page)
+        # Validar que solo sea 5, 10 o 25
+        if per_page not in [5, 10, 25]:
+            per_page = 10
+    except:
+        per_page = 10
+    
+    paginator = Paginator(devices, per_page)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
     # Agregar permisos de edición
-    for device in devices:
+    for device in page_obj:
         device.can_edit = (device.owner == request.user) or request.user.is_superuser
         device.can_delete = (device.owner == request.user) or request.user.is_superuser
     
@@ -249,7 +263,7 @@ def device_list(request):
     status_choices = DeviceStatus.choices
     
     context = {
-        'devices': devices,
+        'page_obj': page_obj,
         'categories': categories,
         'zones': zones,
         'device_types': device_types,
@@ -260,6 +274,8 @@ def device_list(request):
         'selected_status': status,
         'selected_zone': zone,
         'user_org': user_org,
+        'q': search,
+        'per_page': per_page,
     }
     
     return render(request, 'devices/device_list.html', context)
@@ -303,8 +319,8 @@ def create_device(request):
     else:
         form = DeviceForm()
     
-    # Obtener todos los tipos de dispositivos
-    device_types = DeviceType.objects.all()
+    # CORREGIDO: Obtener choices en lugar de usar .objects
+    device_types = DeviceType.choices
     
     context = {
         'form': form,
@@ -330,7 +346,8 @@ def update_device(request, pk):
     else:
         form = DeviceForm(instance=device)
 
-    device_types = DeviceType.objects.all()
+    # CORREGIDO
+    device_types = DeviceType.choices
 
     context = {
         'form': form,
@@ -360,89 +377,69 @@ def delete_device(request, pk):
 @login_required
 @permission_required('devices.view_measurement', raise_exception=True)
 def measurement_list(request):
-    """Lista de mediciones con búsqueda, ordenamiento y paginación"""
+    """Lista todas las mediciones del usuario"""
+    # Obtener organización del usuario (igual que en dashboard)
+    user_org = None
+    if hasattr(request.user, 'profile') and request.user.profile.organization:
+        user_org = request.user.profile.organization
     
-    # Obtener mediciones del usuario
-    measurements = Measurement.objects.filter(
-        device__owner=request.user
-    ).select_related('device', 'device__device_type')
+    # Filtrar mediciones por organización O por propietario
+    if user_org:
+        measurements = Measurement.objects.filter(
+            Q(device__zone__organization=user_org) | Q(device__owner=request.user)
+        ).select_related('device')
+    else:
+        measurements = Measurement.objects.filter(device__owner=request.user).select_related('device')
     
-    # 🔍 BÚSQUEDA
-    search_query = request.GET.get('q', '').strip()
-    if search_query:
-        measurements = measurements.filter(
-            Q(device__name__icontains=search_query) |
-            Q(unit__icontains=search_query) |
-            Q(value__icontains=search_query)
-        )
-    
-    # 📊 FILTROS ADICIONALES
+    # Filtros
     device_id = request.GET.get('device')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
     if device_id:
         measurements = measurements.filter(device_id=device_id)
     
-    date_from = request.GET.get('date_from')
     if date_from:
         measurements = measurements.filter(timestamp__gte=date_from)
     
-    date_to = request.GET.get('date_to')
     if date_to:
         measurements = measurements.filter(timestamp__lte=date_to)
     
-    # 📊 ORDENAMIENTO
-    sort = request.GET.get('sort', '-timestamp')
-    valid_sort_fields = [
-        'timestamp', '-timestamp',
-        'value', '-value',
-        'device__name', '-device__name',
-        'unit', '-unit'
-    ]
+    # Ordenar por fecha descendente
+    measurements = measurements.order_by('-timestamp')
     
-    if sort in valid_sort_fields:
-        measurements = measurements.order_by(sort)
-    else:
-        measurements = measurements.order_by('-timestamp')
-    
-    # 📄 PAGINACIÓN
-    page_size = request.GET.get('page_size')
-    
-    if page_size:
-        try:
-            page_size = int(page_size)
-            request.session['page_size_measurements'] = page_size
-        except ValueError:
-            page_size = request.session.get('page_size_measurements', 15)
-    else:
-        page_size = request.session.get('page_size_measurements', 15)
-    
-    if page_size not in [5, 10, 15, 25, 50, 100]:
-        page_size = 15
-    
-    paginator = Paginator(measurements, page_size)
-    page_number = request.GET.get('page', 1)
-    
+    # Paginación
+    per_page = request.GET.get('per_page', 10)  # Cambiar de 15 a 10
     try:
-        page_obj = paginator.get_page(page_number)
-    except PageNotAnInteger:
-        page_obj = paginator.get_page(1)
-    except EmptyPage:
-        page_obj = paginator.get_page(paginator.num_pages)
+        per_page = int(per_page)
+        # Validar que solo sea 5, 10 o 25
+        if per_page not in [5, 10, 25]:
+            per_page = 10
+    except:
+        per_page = 10
     
-    # Dispositivos para el filtro
-    user_devices = Device.objects.filter(owner=request.user, is_active=True)
+    paginator = Paginator(measurements, per_page)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    # Obtener dispositivos para el filtro
+    if user_org:
+        devices = Device.objects.filter(
+            Q(zone__organization=user_org) | Q(owner=request.user),
+            status='active'
+        ).order_by('name')
+    else:
+        devices = Device.objects.filter(owner=request.user, status='active').order_by('name')
     
     context = {
         'page_obj': page_obj,
-        'search_query': search_query,
-        'current_sort': sort,
-        'page_size': page_size,
-        'total_measurements': paginator.count,
-        'user_devices': user_devices,
+        'devices': devices,
         'selected_device': device_id,
         'date_from': date_from,
         'date_to': date_to,
-        'can_add': request.user.has_perm('devices.add_measurement'),
+        'per_page': per_page,
     }
+    
     return render(request, 'devices/measurement_list.html', context)
 
 
@@ -470,7 +467,7 @@ def create_measurement(request):
         form = MeasurementForm()
     
     # Obtener solo los dispositivos del usuario actual
-    user_devices = Device.objects.filter(owner=request.user, is_active=True)
+    user_devices = Device.objects.filter(owner=request.user, status='active')
     
     context = {
         'form': form,
@@ -499,7 +496,7 @@ def edit_measurement(request, pk):
     else:
         form = MeasurementForm(instance=measurement)
     
-    user_devices = Device.objects.filter(owner=request.user, is_active=True)
+    user_devices = Device.objects.filter(owner=request.user, status='active')
     
     context = {
         'form': form,
@@ -560,24 +557,28 @@ def export_devices_excel(request):
     """Exportar dispositivos a Excel"""
     
     # Obtener el mismo queryset que en device_list (con filtros)
-    devices = Device.objects.filter(owner=request.user).select_related('device_type')
+    # CORREGIDO: Eliminar 'device_type' de select_related
+    devices = Device.objects.filter(owner=request.user).select_related('category', 'zone', 'owner')
     
     # Aplicar búsqueda si existe
     search_query = request.GET.get('q', '').strip()
     if search_query:
         devices = devices.filter(
             Q(name__icontains=search_query) |
-            Q(location__icontains=search_query) |
-            Q(device_type__name__icontains=search_query)
+            Q(description__icontains=search_query)
         )
+    
+    # Aplicar filtro por tipo de dispositivo
+    device_type = request.GET.get('device_type')
+    if device_type:
+        devices = devices.filter(device_type=device_type)
     
     # Aplicar ordenamiento si existe
     sort = request.GET.get('sort', '-created_at')
     valid_sort_fields = [
         'name', '-name',
-        'device_type__name', '-device_type__name',
-        'location', '-location',
-        'is_active', '-is_active',
+        'device_type', '-device_type',
+        'status', '-status',
         'created_at', '-created_at'
     ]
     
@@ -600,7 +601,7 @@ def export_devices_excel(request):
     )
     
     # Encabezados
-    headers = ['ID', 'Nombre', 'Tipo de Dispositivo', 'Ubicación', 'Estado', 'Fecha de Creación', 'Última Actualización']
+    headers = ['ID', 'Nombre', 'Tipo de Dispositivo', 'Estado', 'Categoría', 'Zona', 'Descripción', 'Fecha de Creación']
     ws.append(headers)
     
     # Aplicar estilo a encabezados
@@ -616,11 +617,12 @@ def export_devices_excel(request):
         row = [
             device.id,
             device.name,
-            str(device.device_type),
-            device.location or 'N/A',
-            'Activo' if device.is_active else 'Inactivo',
-            device.created_at.strftime('%d/%m/%Y %H:%M:%S'),
-            device.updated_at.strftime('%d/%m/%Y %H:%M:%S')
+            device.get_device_type_display(),  # Obtener el label legible
+            device.get_status_display(),        # Obtener el label legible
+            device.category.name if device.category else 'N/A',
+            device.zone.name if device.zone else 'N/A',
+            device.description or 'N/A',
+            device.created_at.strftime('%d/%m/%Y %H:%M:%S') if hasattr(device, 'created_at') else 'N/A'
         ]
         ws.append(row)
         
@@ -629,11 +631,13 @@ def export_devices_excel(request):
         for col_num in range(1, len(headers) + 1):
             cell = ws.cell(row=row_num, column=col_num)
             cell.border = border
-            if col_num == 5:  # Columna Estado
-                if device.is_active:
+            if col_num == 4:  # Columna Estado
+                if device.status == 'active':
                     cell.fill = PatternFill(start_color="D4EDDA", end_color="D4EDDA", fill_type="solid")
-                else:
+                elif device.status == 'inactive':
                     cell.fill = PatternFill(start_color="F8D7DA", end_color="F8D7DA", fill_type="solid")
+                elif device.status == 'maintenance':
+                    cell.fill = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
     
     # Ajustar ancho de columnas
     for col_num in range(1, len(headers) + 1):
@@ -666,44 +670,37 @@ def export_devices_excel(request):
 def export_measurements_excel(request):
     """Exportar mediciones a Excel"""
     
-    # Obtener el mismo queryset que en measurement_list (con filtros)
-    measurements = Measurement.objects.filter(
-        device__owner=request.user
-    ).select_related('device', 'device__device_type')
+    # Obtener organización del usuario
+    user_org = None
+    if hasattr(request.user, 'profile') and request.user.profile.organization:
+        user_org = request.user.profile.organization
     
-    # Aplicar búsqueda
-    search_query = request.GET.get('q', '').strip()
-    if search_query:
-        measurements = measurements.filter(
-            Q(device__name__icontains=search_query) |
-            Q(unit__icontains=search_query) |
-            Q(value__icontains=search_query)
-        )
+    # Filtrar mediciones (mismo filtro que en measurement_list)
+    if user_org:
+        measurements = Measurement.objects.filter(
+            Q(device__zone__organization=user_org) | Q(device__owner=request.user)
+        ).select_related('device', 'device__category', 'device__zone')
+    else:
+        measurements = Measurement.objects.filter(
+            device__owner=request.user
+        ).select_related('device', 'device__category', 'device__zone')
     
-    # Filtros adicionales
+    # Aplicar filtros de búsqueda
     device_id = request.GET.get('device')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
     if device_id:
         measurements = measurements.filter(device_id=device_id)
     
-    date_from = request.GET.get('date_from')
     if date_from:
         measurements = measurements.filter(timestamp__gte=date_from)
     
-    date_to = request.GET.get('date_to')
     if date_to:
         measurements = measurements.filter(timestamp__lte=date_to)
     
-    # Ordenamiento
-    sort = request.GET.get('sort', '-timestamp')
-    valid_sort_fields = [
-        'timestamp', '-timestamp',
-        'value', '-value',
-        'device__name', '-device__name',
-        'unit', '-unit'
-    ]
-    
-    if sort in valid_sort_fields:
-        measurements = measurements.order_by(sort)
+    # Ordenar por fecha descendente
+    measurements = measurements.order_by('-timestamp')
     
     # Crear workbook
     wb = Workbook()
@@ -711,7 +708,7 @@ def export_measurements_excel(request):
     ws.title = "Mediciones"
     
     # Estilos
-    header_fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=12)
     border = Border(
         left=Side(style='thin'),
@@ -721,7 +718,7 @@ def export_measurements_excel(request):
     )
     
     # Encabezados
-    headers = ['ID', 'Dispositivo', 'Tipo', 'Valor', 'Unidad', 'Fecha y Hora']
+    headers = ['ID', 'Dispositivo', 'Tipo', 'Valor', 'Unidad', 'Fecha y Hora', 'Categoría', 'Zona']
     ws.append(headers)
     
     # Aplicar estilo a encabezados
@@ -737,10 +734,12 @@ def export_measurements_excel(request):
         row = [
             measurement.id,
             measurement.device.name,
-            str(measurement.device.device_type),
-            float(measurement.value),
+            measurement.device.get_device_type_display(),  # Obtener label legible
+            measurement.value,
             measurement.unit,
-            measurement.timestamp.strftime('%d/%m/%Y %H:%M:%S')
+            measurement.timestamp.strftime('%d/%m/%Y %H:%M:%S'),
+            measurement.device.category.name if measurement.device.category else 'N/A',
+            measurement.device.zone.name if measurement.device.zone else 'N/A',
         ]
         ws.append(row)
         
@@ -749,11 +748,6 @@ def export_measurements_excel(request):
         for col_num in range(1, len(headers) + 1):
             cell = ws.cell(row=row_num, column=col_num)
             cell.border = border
-            
-            # Formato para números
-            if col_num == 4:  # Columna Valor
-                cell.number_format = '#,##0.00'
-                cell.alignment = Alignment(horizontal='right')
     
     # Ajustar ancho de columnas
     for col_num in range(1, len(headers) + 1):
@@ -768,28 +762,6 @@ def export_measurements_excel(request):
         adjusted_width = min(max_length + 2, 50)
         ws.column_dimensions[column_letter].width = adjusted_width
     
-    # Agregar hoja de resumen
-    ws_summary = wb.create_sheet("Resumen")
-    ws_summary.append(['Estadísticas de Mediciones'])
-    ws_summary.append([])
-    ws_summary.append(['Total de mediciones:', measurements.count()])
-    
-    if measurements.exists():
-        total_value = sum(float(m.value) for m in measurements)
-        avg_value = total_value / measurements.count()
-        max_value = max(float(m.value) for m in measurements)
-        min_value = min(float(m.value) for m in measurements)
-        
-        ws_summary.append(['Valor total:', f'{total_value:.2f}'])
-        ws_summary.append(['Valor promedio:', f'{avg_value:.2f}'])
-        ws_summary.append(['Valor máximo:', f'{max_value:.2f}'])
-        ws_summary.append(['Valor mínimo:', f'{min_value:.2f}'])
-    
-    # Estilo para la hoja de resumen
-    ws_summary.cell(1, 1).font = Font(bold=True, size=14)
-    for row in range(3, 8):
-        ws_summary.cell(row, 1).font = Font(bold=True)
-    
     # Preparar respuesta HTTP
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -797,7 +769,7 @@ def export_measurements_excel(request):
     filename = f'mediciones_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
-    # Guardar workbook en la respuesta
+    # Guardar workbook
     wb.save(response)
     
     return response
