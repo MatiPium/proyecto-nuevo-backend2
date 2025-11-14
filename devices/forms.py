@@ -1,6 +1,6 @@
 from django import forms
-from django.core.exceptions import ValidationError
 from .models import Device, Measurement, Alert
+from accounts.models import Category, Zone
 
 
 # ---------------------------
@@ -11,99 +11,61 @@ class DeviceForm(forms.ModelForm):
     
     class Meta:
         model = Device
-        fields = ['name', 'device_type', 'location', 'is_active']
+        fields = ['name', 'description', 'device_type', 'status', 'category', 'zone']
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Nombre del dispositivo',
-                'required': True
+                'placeholder': 'Nombre del dispositivo'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'placeholder': 'Descripción del dispositivo',
+                'rows': 3
             }),
             'device_type': forms.Select(attrs={
-                'class': 'form-select',
-                'required': True
+                'class': 'form-select'
             }),
-            'location': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ubicación del dispositivo'
+            'status': forms.Select(attrs={
+                'class': 'form-select'
             }),
-            'is_active': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
+            'category': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'zone': forms.Select(attrs={
+                'class': 'form-select'
             }),
         }
         labels = {
             'name': 'Nombre',
-            'device_type': 'Tipo de Dispositivo',
-            'location': 'Ubicación',
-            'is_active': 'Activo',
+            'description': 'Descripción',
+            'device_type': 'Tipo de dispositivo',
+            'status': 'Estado',
+            'category': 'Categoría',
+            'zone': 'Zona',
         }
-        error_messages = {
-            'name': {
-                'required': 'El nombre del dispositivo es obligatorio.',
-                'max_length': 'El nombre no puede exceder 200 caracteres.',
-            },
-            'device_type': {
-                'required': 'Debe seleccionar un tipo de dispositivo.',
-            },
-        }
-    
-    def clean_name(self):
-        """Validar que el nombre no esté vacío y no tenga solo espacios"""
-        name = self.cleaned_data.get('name', '').strip()
-        
-        if not name:
-            raise ValidationError('El nombre del dispositivo no puede estar vacío.')
-        
-        if len(name) < 3:
-            raise ValidationError('El nombre debe tener al menos 3 caracteres.')
-        
-        # Verificar duplicados para el mismo usuario
-        user = self.instance.owner if self.instance.pk else None
-        if user:
-            existing = Device.objects.filter(
-                name__iexact=name,
-                owner=user
-            ).exclude(pk=self.instance.pk if self.instance.pk else None)
-            
-            if existing.exists():
-                raise ValidationError(f'Ya tienes un dispositivo con el nombre "{name}".')
-        
-        return name
-    
-    def clean_location(self):
-        """Validar ubicación"""
-        location = self.cleaned_data.get('location', '').strip()
-        
-        if location and len(location) < 3:
-            raise ValidationError('La ubicación debe tener al menos 3 caracteres.')
-        
-        return location
 
 
 # ---------------------------
 # 📏 Measurement Form
 # ---------------------------
 class MeasurementForm(forms.ModelForm):
-    """Formulario para registrar mediciones"""
+    """Formulario para crear mediciones"""
     
     class Meta:
         model = Measurement
         fields = ['device', 'value', 'unit']
         widgets = {
             'device': forms.Select(attrs={
-                'class': 'form-select',
-                'required': True
+                'class': 'form-select'
             }),
             'value': forms.NumberInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Valor medido',
-                'step': '0.01',
-                'min': '0',
-                'required': True
+                'placeholder': 'Valor',
+                'step': '0.01'
             }),
             'unit': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'kWh, W, etc.',
-                'required': True
+                'placeholder': 'Unidad (kWh, W, etc.)'
             }),
         }
         labels = {
@@ -111,77 +73,68 @@ class MeasurementForm(forms.ModelForm):
             'value': 'Valor',
             'unit': 'Unidad',
         }
-        error_messages = {
-            'device': {
-                'required': 'Debe seleccionar un dispositivo.',
-            },
-            'value': {
-                'required': 'El valor de la medición es obligatorio.',
-                'invalid': 'Ingrese un valor numérico válido.',
-            },
-            'unit': {
-                'required': 'La unidad de medida es obligatoria.',
-            },
+
+
+# ---------------------------
+# 🚨 Alert Form
+# ---------------------------
+class AlertForm(forms.ModelForm):
+    """Formulario para crear alertas"""
+    
+    class Meta:
+        model = Alert
+        fields = ['device', 'alert_type', 'message']
+        widgets = {
+            'device': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'alert_type': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'message': forms.Textarea(attrs={
+                'class': 'form-control',
+                'placeholder': 'Mensaje de la alerta',
+                'rows': 3
+            }),
         }
-    
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)
-        super().__init__(*args, **kwargs)
-        
-        # Filtrar dispositivos por usuario
-        if user:
-            self.fields['device'].queryset = Device.objects.filter(
-                owner=user,
-                is_active=True
-            ).select_related('device_type')
-        
-        # Ayuda contextual
-        self.fields['value'].help_text = 'Ingrese un valor numérico positivo mayor a 0'
-        self.fields['unit'].help_text = 'Ejemplo: kWh, W, kW, V, A'
-    
-    def clean_value(self):
-        """Validar que el valor sea positivo y mayor a 0"""
-        value = self.cleaned_data.get('value')
-        
-        if value is None:
-            raise ValidationError('El valor de la medición es obligatorio.')
-        
-        if value <= 0:
-            raise ValidationError('El valor debe ser mayor a 0.')
-        
-        if value > 999999.99:
-            raise ValidationError('El valor es demasiado grande. Máximo permitido: 999,999.99')
-        
-        return value
-    
-    def clean_unit(self):
-        """Validar que la unidad no esté vacía"""
-        unit = self.cleaned_data.get('unit', '').strip()
-        
-        if not unit:
-            raise ValidationError('La unidad de medida es obligatoria.')
-        
-        if len(unit) > 20:
-            raise ValidationError('La unidad no puede exceder 20 caracteres.')
-        
-        # Unidades válidas comunes
-        valid_units = ['kWh', 'W', 'kW', 'MW', 'V', 'A', 'mA', 'Hz', 'Wh', 'MWh']
-        if unit not in valid_units:
-            # Solo advertencia, no error
-            pass
-        
-        return unit
-    
-    def clean(self):
-        """Validación general del formulario"""
-        cleaned_data = super().clean()
-        device = cleaned_data.get('device')
-        value = cleaned_data.get('value')
-        
-        # Validar que el dispositivo esté activo
-        if device and not device.is_active:
-            raise ValidationError({
-                'device': 'No puede registrar mediciones en un dispositivo inactivo.'
-            })
-        
-        return cleaned_data
+        labels = {
+            'device': 'Dispositivo',
+            'alert_type': 'Tipo de alerta',
+            'message': 'Mensaje',
+        }
+
+
+# ---------------------------
+# 🔍 Device Filter Form
+# ---------------------------
+class DeviceFilterForm(forms.Form):
+    """Formulario para filtrar dispositivos"""
+    search = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Buscar dispositivos...'
+        })
+    )
+    device_type = forms.ChoiceField(
+        required=False,
+        choices=[('', 'Todos los tipos')] + list(Device._meta.get_field('device_type').choices),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    status = forms.ChoiceField(
+        required=False,
+        choices=[('', 'Todos los estados')] + list(Device._meta.get_field('status').choices),
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    category = forms.ModelChoiceField(
+        required=False,
+        queryset=Category.objects.all(),
+        empty_label='Todas las categorías',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    zone = forms.ModelChoiceField(
+        required=False,
+        queryset=Zone.objects.all(),
+        empty_label='Todas las zonas',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )

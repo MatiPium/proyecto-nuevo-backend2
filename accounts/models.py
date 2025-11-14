@@ -4,6 +4,8 @@ from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
 from PIL import Image
 from django.core.exceptions import ValidationError
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 def validate_image_size(image):
     """Valida que la imagen no supere 2MB"""
@@ -11,27 +13,76 @@ def validate_image_size(image):
     if filesize > 2 * 1024 * 1024:  # 2MB
         raise ValidationError("El tamaño máximo de la imagen es 2MB")
 
-class UserProfile(models.Model):
-    """Perfil extendido del usuario"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    phone = models.CharField(max_length=15, blank=True, null=True, verbose_name='Teléfono')
-    avatar = models.ImageField(
-        upload_to='avatars/',
-        blank=True,
-        null=True,
-        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif'])],
-        verbose_name='Foto de perfil'
-    )
-    bio = models.TextField(max_length=500, blank=True, null=True, verbose_name='Biografía')
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de creación')
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='Última actualización')
+class Organization(models.Model):
+    """Modelo para organizaciones"""
+    name = models.CharField(max_length=200, verbose_name="Nombre")
+    description = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
     
     class Meta:
-        verbose_name = 'Perfil de Usuario'
-        verbose_name_plural = 'Perfiles de Usuarios'
+        verbose_name = "Organización"
+        verbose_name_plural = "Organizaciones"
     
     def __str__(self):
-        return f'Perfil de {self.user.username}'
+        return self.name
+
+
+class Zone(models.Model):
+    """Modelo para zonas geográficas"""
+    name = models.CharField(max_length=200, verbose_name="Nombre")
+    description = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='zones', null=True, blank=True)
+    
+    class Meta:
+        verbose_name = "Zona"
+        verbose_name_plural = "Zonas"
+    
+    def __str__(self):
+        return self.name
+
+
+class Category(models.Model):
+    """Modelo para categorías de dispositivos"""
+    name = models.CharField(max_length=100, verbose_name="Nombre")
+    description = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    
+    class Meta:
+        verbose_name = "Categoría"
+        verbose_name_plural = "Categorías"
+    
+    def __str__(self):
+        return self.name
+
+
+class UserProfile(models.Model):
+    """Perfil de usuario extendido"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True, verbose_name="Avatar")
+    bio = models.TextField(blank=True, null=True, verbose_name="Biografía")
+    phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Teléfono")
+    organization = models.ForeignKey(
+        Organization, 
+        on_delete=models.SET_NULL, 
+        null=True,  # ← IMPORTANTE: debe ser null=True
+        blank=True,  # ← IMPORTANTE: debe ser blank=True
+        related_name='users',
+        verbose_name="Organización"
+    )
+    zone = models.ForeignKey(
+        Zone, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='users',
+        verbose_name="Zona"
+    )
+    
+    class Meta:
+        verbose_name = "Perfil de Usuario"
+        verbose_name_plural = "Perfiles de Usuario"
+    
+    def __str__(self):
+        return f"Perfil de {self.user.username}"
     
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -48,21 +99,16 @@ class UserProfile(models.Model):
                 pass
 
 
-# Señal para crear perfil automáticamente
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
-    """Crear perfil cuando se crea un usuario"""
+    """Crear perfil automáticamente cuando se crea un usuario"""
     if created:
         UserProfile.objects.create(user=instance)
+
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
     """Guardar perfil cuando se guarda el usuario"""
     if hasattr(instance, 'profile'):
         instance.profile.save()
-    else:
-        UserProfile.objects.create(user=instance)
 

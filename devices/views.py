@@ -7,18 +7,19 @@ from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Q
+from django.db.models import Q, Count, Avg
+from django.http import JsonResponse, HttpResponse
 from django.core.exceptions import PermissionDenied
-from django.db.models import Avg, Count
-from django.http import HttpResponse
 
 # Para Excel
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-from .models import Device, Measurement, Alert, DeviceType
-from .forms import DeviceForm, MeasurementForm
+# Importar modelos
+from .models import Device, Measurement, Alert, DeviceType, DeviceStatus, AlertType
+from accounts.models import Category, Zone, Organization  # ← AGREGAR ESTA LÍNEA
+from .forms import DeviceForm, MeasurementForm, AlertForm, DeviceFilterForm
 
 
 # -------------------------------------
@@ -111,36 +112,79 @@ def logout_view(request):
 
 @login_required
 def dashboard(request):
-    """Vista principal del dashboard"""
-    # Estadísticas generales
-    total_devices = Device.objects.filter(owner=request.user).count()
-    active_devices = Device.objects.filter(owner=request.user, is_active=True).count()
+    """Dashboard con estadísticas de la organización"""
+    # Obtener organización del usuario
+    user_org = None
+    if hasattr(request.user, 'profile') and request.user.profile.organization:
+        user_org = request.user.profile.organization
     
-    # Mediciones recientes
-    recent_measurements = Measurement.objects.filter(
-        device__owner=request.user
-    ).select_related('device').order_by('-timestamp')[:10]
+    # Filtrar datos por organización
+    if user_org:
+        devices = Device.objects.filter(zone__organization=user_org)
+        measurements = Measurement.objects.filter(device__zone__organization=user_org)
+        alerts = Alert.objects.filter(device__zone__organization=user_org)
+    else:
+        devices = Device.objects.filter(owner=request.user)
+        measurements = Measurement.objects.filter(device__owner=request.user)
+        alerts = Alert.objects.filter(device__owner=request.user)
     
-    # Alertas recientes
-    recent_alerts = Alert.objects.filter(
-        device__owner=request.user,
-        is_resolved=False
-    ).select_related('device').order_by('-created_at')[:5]
+    # Estadísticas
+    total_devices = devices.count()
+    active_devices = devices.filter(status='active').count()  # ← CAMBIADO de is_active=True a status='active'
+    inactive_devices = devices.filter(status='inactive').count()
+    maintenance_devices = devices.filter(status='maintenance').count()
     
-    # Consumo promedio del último mes
-    last_month = timezone.now() - timedelta(days=30)
-    avg_consumption = Measurement.objects.filter(
-        device__owner=request.user,
-        timestamp__gte=last_month
-    ).aggregate(avg_value=Avg('value'))
+    total_measurements = measurements.count()
+    unresolved_alerts = alerts.filter(is_resolved=False).count()
+    
+    # Últimas mediciones
+    recent_measurements = measurements.select_related('device').order_by('-timestamp')[:10]
+    
+    # Alertas recientes no resueltas
+    recent_alerts = alerts.filter(is_resolved=False).select_related('device').order_by('-created_at')[:5]
+    
+    # Dispositivos por tipo
+    devices_by_type = {}
+    for choice in Device._meta.get_field('device_type').choices:
+        type_code = choice[0]
+        type_name = choice[1]
+        count = devices.filter(device_type=type_code).count()
+        if count > 0:
+            devices_by_type[type_name] = count
+    
+    # Dispositivos por estado
+    devices_by_status = {}
+    for choice in Device._meta.get_field('status').choices:
+        status_code = choice[0]
+        status_name = choice[1]
+        count = devices.filter(status=status_code).count()
+        if count > 0:
+            devices_by_status[status_name] = count
+    
+    # Alertas por tipo
+    alerts_by_type = {}
+    for choice in Alert._meta.get_field('alert_type').choices:
+        type_code = choice[0]
+        type_name = choice[1]
+        count = alerts.filter(alert_type=type_code, is_resolved=False).count()
+        if count > 0:
+            alerts_by_type[type_name] = count
     
     context = {
         'total_devices': total_devices,
         'active_devices': active_devices,
+        'inactive_devices': inactive_devices,
+        'maintenance_devices': maintenance_devices,
+        'total_measurements': total_measurements,
+        'unresolved_alerts': unresolved_alerts,
         'recent_measurements': recent_measurements,
         'recent_alerts': recent_alerts,
-        'avg_consumption': avg_consumption['avg_value'] or 0,
+        'devices_by_type': devices_by_type,
+        'devices_by_status': devices_by_status,
+        'alerts_by_type': alerts_by_type,
+        'user_org': user_org,
     }
+    
     return render(request, 'devices/dashboard.html', context)
 
 
@@ -151,75 +195,74 @@ def dashboard(request):
 @login_required
 @permission_required('devices.view_device', raise_exception=True)
 def device_list(request):
-    """Lista de dispositivos con búsqueda, ordenamiento y paginación"""
+    """Lista dispositivos de la misma organización"""
+    # Obtener la organización del usuario
+    user_org = None
+    if hasattr(request.user, 'profile') and request.user.profile.organization:
+        user_org = request.user.profile.organization
     
-    # Obtener dispositivos del usuario
-    devices = Device.objects.filter(owner=request.user).select_related('device_type')
+    # Filtrar dispositivos por organización
+    if user_org:
+        devices = Device.objects.filter(
+            zone__organization=user_org
+        ).select_related('category', 'zone', 'owner')  # ← ELIMINADO 'device_type'
+    else:
+        # Si no tiene organización, solo ve sus propios dispositivos
+        devices = Device.objects.filter(owner=request.user).select_related('category', 'zone', 'owner')
     
-    # 🔍 BÚSQUEDA
-    search_query = request.GET.get('q', '').strip()
-    if search_query:
+    # Filtros de búsqueda
+    search = request.GET.get('search', '')
+    device_type = request.GET.get('device_type', '')
+    category = request.GET.get('category', '')
+    status = request.GET.get('status', '')
+    zone = request.GET.get('zone', '')
+    
+    if search:
         devices = devices.filter(
-            Q(name__icontains=search_query) |
-            Q(location__icontains=search_query) |
-            Q(device_type__name__icontains=search_query)
+            Q(name__icontains=search) | 
+            Q(description__icontains=search)
         )
+    if device_type:
+        devices = devices.filter(device_type=device_type)
+    if category:
+        devices = devices.filter(category_id=category)
+    if status:
+        devices = devices.filter(status=status)
+    if zone:
+        devices = devices.filter(zone_id=zone)
     
-    # 📊 ORDENAMIENTO
-    sort = request.GET.get('sort', '-created_at')
-    valid_sort_fields = [
-        'name', '-name',
-        'device_type__name', '-device_type__name',
-        'location', '-location',
-        'is_active', '-is_active',
-        'created_at', '-created_at'
-    ]
+    # Agregar permisos de edición
+    for device in devices:
+        device.can_edit = (device.owner == request.user) or request.user.is_superuser
+        device.can_delete = (device.owner == request.user) or request.user.is_superuser
     
-    if sort in valid_sort_fields:
-        devices = devices.order_by(sort)
-    else:
-        devices = devices.order_by('-created_at')
+    # Datos para filtros
+    categories = Category.objects.all()
+    zones = Zone.objects.filter(organization=user_org) if user_org else Zone.objects.all()
     
-    # 📄 PAGINACIÓN
-    # Obtener tamaño de página de GET o sesión
-    page_size = request.GET.get('page_size')
+    # Obtener choices de device_type del modelo
+    from .models import DeviceType
+    device_types = DeviceType.choices
     
-    if page_size:
-        try:
-            page_size = int(page_size)
-            # Guardar en sesión
-            request.session['page_size_devices'] = page_size
-        except ValueError:
-            page_size = request.session.get('page_size_devices', 10)
-    else:
-        page_size = request.session.get('page_size_devices', 10)
-    
-    # Validar tamaño de página
-    if page_size not in [5, 10, 15, 25, 50, 100]:
-        page_size = 10
-    
-    paginator = Paginator(devices, page_size)
-    page_number = request.GET.get('page', 1)
-    
-    try:
-        page_obj = paginator.get_page(page_number)
-    except PageNotAnInteger:
-        page_obj = paginator.get_page(1)
-    except EmptyPage:
-        page_obj = paginator.get_page(paginator.num_pages)
+    # Obtener choices de status del modelo
+    from .models import DeviceStatus
+    status_choices = DeviceStatus.choices
     
     context = {
-        'page_obj': page_obj,
-        'search_query': search_query,
-        'current_sort': sort,
-        'page_size': page_size,
-        'total_devices': paginator.count,
-        'can_add': request.user.has_perm('devices.add_device'),
-        'can_edit': request.user.has_perm('devices.change_device'),
-        'can_delete': request.user.has_perm('devices.delete_device'),
+        'devices': devices,
+        'categories': categories,
+        'zones': zones,
+        'device_types': device_types,
+        'status_choices': status_choices,
+        'search': search,
+        'selected_type': device_type,
+        'selected_category': category,
+        'selected_status': status,
+        'selected_zone': zone,
+        'user_org': user_org,
     }
+    
     return render(request, 'devices/device_list.html', context)
-
 
 @login_required
 @permission_required('devices.view_device', raise_exception=True)
